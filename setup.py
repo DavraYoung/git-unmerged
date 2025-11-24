@@ -12,8 +12,8 @@ if readme_file.exists():
 
 setup(
     name="git-unmerged",
-    version="1.0.0",
-    description="Analyze git branches to find unmerged commits",
+    version="1.1.0",
+    description="Analyze git branches to find unmerged commits with contributor tracking",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Dovron Sherbaev",

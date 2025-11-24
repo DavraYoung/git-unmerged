@@ -99,17 +99,66 @@ class GitUnmerged:
 
         return len(output.split('\n'))
 
+    def get_unmerged_commit_details(self, branch_name: str) -> List[Dict]:
+        """Get detailed information about unmerged commits."""
+        # Handle both origin/ prefixed and non-prefixed branch names
+        remote_branch = f"origin/{branch_name}" if not branch_name.startswith('origin/') else branch_name
+        cmd = f'git log {self.base_branch}..{remote_branch} --format="%h|%an|%ae|%s|%ci"'
+        output = self.run_git_command(cmd)
+
+        if not output:
+            return []
+
+        commits = []
+        for line in output.split('\n'):
+            if not line:
+                continue
+            parts = line.split('|')
+            if len(parts) == 5:
+                commits.append({
+                    'hash': parts[0],
+                    'author_name': parts[1],
+                    'author_email': parts[2],
+                    'subject': parts[3],
+                    'date': parts[4]
+                })
+
+        return commits
+
+    def get_contributors(self, branch_name: str) -> List[str]:
+        """Get unique contributors (authors) for unmerged commits in a branch."""
+        # Handle both origin/ prefixed and non-prefixed branch names
+        remote_branch = f"origin/{branch_name}" if not branch_name.startswith('origin/') else branch_name
+        cmd = f'git log {self.base_branch}..{remote_branch} --format="%an <%ae>"'
+        output = self.run_git_command(cmd)
+
+        if not output:
+            return []
+
+        # Get unique contributors while preserving order
+        contributors = []
+        seen = set()
+        for line in output.split('\n'):
+            if line and line not in seen:
+                contributors.append(line)
+                seen.add(line)
+
+        return contributors
+
     def fetch_remote(self, quiet: bool = True) -> None:
         """Fetch latest changes from remote."""
         cmd = "git fetch --all" + (" --quiet" if quiet else "")
         self.run_git_command(cmd)
 
-    def analyze(self, fetch: bool = True) -> List[Dict]:
+    def analyze(self, fetch: bool = True, include_contributors: bool = True,
+                include_commit_details: bool = False) -> List[Dict]:
         """
         Analyze branches and return unmerged ones.
 
         Args:
             fetch: Whether to fetch from remote first (default: True)
+            include_contributors: Whether to include contributor information (default: True)
+            include_commit_details: Whether to include detailed commit information (default: False)
 
         Returns:
             List of dictionaries containing branch information
@@ -131,6 +180,13 @@ class GitUnmerged:
             unmerged_count = self.get_unmerged_commits(branch['name'])
             if unmerged_count > 0:
                 branch['unmerged_commits'] = unmerged_count
+
+                if include_contributors:
+                    branch['contributors'] = self.get_contributors(branch['name'])
+
+                if include_commit_details:
+                    branch['commit_details'] = self.get_unmerged_commit_details(branch['name'])
+
                 unmerged_branches.append(branch)
 
         # Sort by date (most recent first)

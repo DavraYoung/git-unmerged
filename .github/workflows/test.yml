@@ -1,0 +1,135 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, dev, develop ]
+  pull_request:
+    branches: [ main, dev, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          # Reduce matrix size by excluding some combinations
+          - os: macos-latest
+            python-version: '3.8'
+          - os: macos-latest
+            python-version: '3.9'
+          - os: windows-latest
+            python-version: '3.8'
+          - os: windows-latest
+            python-version: '3.9'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: Install package
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Make test script executable (Unix)
+      if: runner.os != 'Windows'
+      run: chmod +x test_setup.sh
+
+    - name: Run tests (Unix)
+      if: runner.os != 'Windows'
+      run: python -m unittest discover tests -v
+
+    - name: Run tests (Windows with Git Bash)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: python -m unittest discover tests -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  test-cli:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: Install package
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Test CLI help
+      run: |
+        git-unmerged --help
+        git-unmerged --version
+
+    - name: Create test repository
+      run: |
+        chmod +x test_setup.sh
+        ./test_setup.sh /tmp/test-repo
+
+    - name: Test CLI default mode
+      run: |
+        git-unmerged --repo /tmp/test-repo --base-branch origin/dev --ignore-pattern "" --no-fetch --days 365
+
+    - name: Test CLI verbose mode
+      run: |
+        git-unmerged --repo /tmp/test-repo --base-branch origin/dev --ignore-pattern "" --no-fetch --days 365 --verbose
+
+    - name: Verify output contains contributors
+      run: |
+        OUTPUT=$(git-unmerged --repo /tmp/test-repo --base-branch origin/dev --ignore-pattern "" --no-fetch --days 365)
+        echo "$OUTPUT"
+        echo "$OUTPUT" | grep -q "Contributors" || (echo "Contributors column not found" && exit 1)
+        echo "$OUTPUT" | grep -q "John Doe" || (echo "John Doe not found" && exit 1)
+
+    - name: Verify verbose output contains commit details
+      run: |
+        OUTPUT=$(git-unmerged --repo /tmp/test-repo --base-branch origin/dev --ignore-pattern "" --no-fetch --days 365 --verbose)
+        echo "$OUTPUT"
+        echo "$OUTPUT" | grep -q "Missing commits against" || (echo "Verbose output not found" && exit 1)
+        echo "$OUTPUT" | grep -q "Hash" || (echo "Hash column not found" && exit 1)
