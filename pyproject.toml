@@ -31,4 +31,4 @@ classifiers = [
 git-unmerged = "git_unmerged.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/git-unmerged"
+Homepage = "https://github.com/DavraYoung/git-unmerged"
