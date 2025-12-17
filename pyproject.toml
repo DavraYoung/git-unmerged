@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "git-unmerged"
-version = "1.1.0"
+version = "1.2.0"
 description = "Analyze git branches to find unmerged commits with contributor tracking"
 readme = "README.md"
 requires-python = ">=3.7"

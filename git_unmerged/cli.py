@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import sys
+from io import StringIO
 from pathlib import Path
-from .analyzer import GitUnmerged
+from .analyzer import GitUnmerged, relative_date
 
 
 def main():
@@ -74,9 +76,21 @@ Examples:
     )
 
     parser.add_argument(
+        '--csv',
+        action='store_true',
+        help='Output results in CSV format'
+    )
+
+    parser.add_argument(
+        '--absolute-date',
+        action='store_true',
+        help='Show dates in absolute format instead of relative (e.g., "2025-12-01" instead of "15 days ago")'
+    )
+
+    parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s 1.1.0'
+        version='%(prog)s 1.2.0'
     )
 
     args = parser.parse_args()
@@ -117,16 +131,42 @@ Examples:
         include_commit_details=args.verbose
     )
 
-    print(f"\nFound {len(unmerged_branches)} branches NOT merged into {args.base_branch}:\n")
+    # Helper function to format date (relative by default, absolute with --absolute-date)
+    def format_date(branch):
+        if args.absolute_date:
+            return branch['date_str']
+        return relative_date(branch['date'])
 
-    if unmerged_branches:
+    # Helper function to get contributors as string
+    def get_contributors_str(branch):
+        if 'contributors' in branch and branch['contributors']:
+            names = [c.split('<')[0].strip() for c in branch['contributors']]
+            return ', '.join(names)
+        return ""
+
+    if args.csv:
+        # CSV output mode
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Branch Name', 'Commits', 'Contributors', 'Last Commit Date'])
+        for branch in unmerged_branches:
+            writer.writerow([
+                branch['name'],
+                branch['unmerged_commits'],
+                get_contributors_str(branch),
+                format_date(branch)
+            ])
+        print(output.getvalue(), end='')
+    elif unmerged_branches:
+        print(f"\nFound {len(unmerged_branches)} branches NOT merged into {args.base_branch}:\n")
+
         if args.verbose:
             # Verbose mode: show detailed commit information
             for branch in unmerged_branches:
                 print(f"\n{'='*100}")
                 print(f"Branch: {branch['name']}")
                 print(f"Unmerged commits: {branch['unmerged_commits']}")
-                print(f"Last commit date: {branch['date_str']}")
+                print(f"Last commit date: {format_date(branch)}")
 
                 # Show contributors
                 if 'contributors' in branch and branch['contributors']:
@@ -155,19 +195,15 @@ Examples:
 
             # Print branches
             for branch in unmerged_branches:
-                # Format contributors list
-                contributors = ""
-                if 'contributors' in branch and branch['contributors']:
-                    # Extract just names (without emails) for cleaner display
-                    names = [c.split('<')[0].strip() for c in branch['contributors']]
-                    contributors = ', '.join(names)
-                    if len(contributors) > 38:
-                        contributors = contributors[:35] + "..."
+                contributors = get_contributors_str(branch)
+                if len(contributors) > 38:
+                    contributors = contributors[:35] + "..."
 
-                print(f"{branch['name']:<50} {branch['unmerged_commits']:<10} {contributors:<40} {branch['date_str']}")
+                print(f"{branch['name']:<50} {branch['unmerged_commits']:<10} {contributors:<40} {format_date(branch)}")
 
             print(f"\n\nTotal unmerged branches: {len(unmerged_branches)}")
     else:
+        print(f"\nFound {len(unmerged_branches)} branches NOT merged into {args.base_branch}:\n")
         print("No unmerged branches found.")
 
     return 0

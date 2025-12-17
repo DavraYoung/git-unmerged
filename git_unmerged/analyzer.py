@@ -6,6 +6,49 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 
 
+def relative_date(dt: datetime) -> str:
+    """Convert datetime to human-readable relative string like '15 days ago'."""
+    now = datetime.now()
+    diff = now - dt
+
+    seconds = diff.total_seconds()
+    minutes = seconds / 60
+    hours = minutes / 60
+    days = diff.days
+
+    if days == 0:
+        if hours < 1:
+            if minutes < 1:
+                return "just now"
+            elif minutes < 2:
+                return "1 minute ago"
+            else:
+                return f"{int(minutes)} minutes ago"
+        elif hours < 2:
+            return "1 hour ago"
+        else:
+            return f"{int(hours)} hours ago"
+    elif days == 1:
+        return "1 day ago"
+    elif days < 7:
+        return f"{days} days ago"
+    elif days < 14:
+        return "1 week ago"
+    elif days < 30:
+        weeks = days // 7
+        return f"{weeks} weeks ago"
+    elif days < 60:
+        return "1 month ago"
+    elif days < 365:
+        months = days // 30
+        return f"{months} months ago"
+    elif days < 730:
+        return "1 year ago"
+    else:
+        years = days // 365
+        return f"{years} years ago"
+
+
 class GitUnmerged:
     """Analyze git branches to find unmerged commits."""
 
